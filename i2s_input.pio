@@ -1,0 +1,30 @@
+; I2S controller, 32-bit stereo slots, exactly 128 PIO cycles per frame.
+; Side-set LSB = BCLK (GPIO16), MSB = WS (GPIO17).
+; Each low/high phase is one instruction, including loop boundaries.
+.program i2s_clocks
+.side_set 2
+.wrap_target
+    set x, 30        side 0b00
+loop_left:
+    nop              side 0b01
+    jmp x-- loop_left side 0b00
+    nop              side 0b01
+    set x, 30        side 0b10
+loop_right:
+    nop              side 0b11
+    jmp x-- loop_right side 0b10
+    nop              side 0b11
+.wrap
+
+; One instance per SD wire. Full sys-clock execution; WAIT follows the
+; common controller clocks. Skip the transition bit (I2S one-bit delay).
+; Subsequent 32-bit words naturally span WS boundaries by one bit.
+.program i2s_receive
+    wait 1 gpio 17
+    wait 0 gpio 17
+    wait 1 gpio 16
+.wrap_target
+    wait 0 gpio 16
+    wait 1 gpio 16
+    in pins, 1
+.wrap
